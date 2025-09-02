@@ -1,22 +1,20 @@
+# app/models/grocery.py
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
-class GroceryCreate(BaseModel):
-    name: str
-    quantity: Optional[str] = None  # e.g. "2kg", "3 packs"
-
-class GroceryUpdate(BaseModel):
-    bought: bool
-
-class GroceryPublic(BaseModel):
+class GroceryItem(BaseModel):
     id: str = Field(..., alias="_id")
     user_id: str
     name: str
-    quantity: Optional[str] = None
-    bought: bool = False
+    name_lower: str
+    status: str = "in_stock"  # "in_stock" or "to_buy"
     createdAt: datetime
 
     class Config:
-        validate_by_name = True
+        populate_by_name = True
         from_attributes = True
+
+class GroceryCreate(BaseModel):
+    name: str
+    status: str = "in_stock"

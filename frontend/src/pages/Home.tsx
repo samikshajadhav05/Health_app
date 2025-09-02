@@ -14,233 +14,129 @@ type Macros = {
 };
 
 const getToday = () => new Date().toISOString().slice(0, 10);
-const SUBMIT_STATE_KEY = "healthapp_submit_state_date";
 
 const Home: React.FC = () => {
-  // ✅ Weight logging
+  // State for each input field
   const [weight, setWeight] = useState("");
   const [measuredAt, setMeasuredAt] = useState("");
-
-  // ✅ Activity logging
   const [activityType, setActivityType] = useState("");
   const [steps, setSteps] = useState("");
   const [duration, setDuration] = useState("");
-
-  // ✅ Meals + Macros
   const [meals, setMeals] = useState({
     breakfast: "",
     lunch: "",
     snacks: "",
     dinner: "",
   });
-  const [macros, setMacros] = useState<Macros>({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    fiber: 0,
-  });
+  const [macros, setMacros] = useState<Macros | null>(null);
 
-  // ✅ Local loading states (section-specific)
-  const [loadingWeight, setLoadingWeight] = useState(false);
-  const [loadingActivity, setLoadingActivity] = useState(false);
-  const [loadingMacros, setLoadingMacros] = useState(false);
+  // Loading and error states
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // ✅ “Logged today” flags (UI badges only; inputs remain editable)
-  const [weightLogged, setWeightLogged] = useState<null | { value: number; measuredAt: string }>(null);
-  const [activityLogged, setActivityLogged] = useState<null | { type: string; steps?: number; duration?: number }>(null);
-  const [mealsLogged, setMealsLogged] = useState<boolean>(false);
-
-  // ---- Bootstrap: reset flags if date changed, and pull today's log if present ----
+  // Fetch today's log on component mount
   useEffect(() => {
-    const today = getToday();
-    const storedDate = localStorage.getItem(SUBMIT_STATE_KEY);
-
-    // If day changed, clear local flags
-    if (storedDate !== today) {
-      localStorage.setItem(SUBMIT_STATE_KEY, today);
-      localStorage.removeItem("weightLogged");
-      localStorage.removeItem("activityLogged");
-      localStorage.removeItem("mealsLogged");
-    } else {
-      // restore badges
-      const w = localStorage.getItem("weightLogged");
-      const a = localStorage.getItem("activityLogged");
-      const m = localStorage.getItem("mealsLogged");
-      if (w) setWeightLogged(JSON.parse(w));
-      if (a) setActivityLogged(JSON.parse(a));
-      if (m) setMealsLogged(m === "true");
-    }
-
-    // Pull today's log from backend to PREFILL inputs & set badges
-    (async () => {
+    const fetchTodayLog = async () => {
       try {
+        const today = getToday();
         const logs = await dailyLogService.getLogs();
-        const todayLog = (logs || []).find((l: any) => l.date === today);
+        const todayLog = logs.find((l: any) => l.date === today);
+
         if (todayLog) {
-          if (todayLog.weight && typeof todayLog.weight === "object") {
-            const saved = { value: todayLog.weight.value, measuredAt: todayLog.weight.measuredAt };
-            setWeightLogged(saved);
-            localStorage.setItem("weightLogged", JSON.stringify(saved));
-            // prefill fields so user can SEE it's logged
-            setWeight(String(todayLog.weight.value ?? ""));
-            setMeasuredAt(todayLog.weight.measuredAt ?? "");
+          // Pre-fill fields if data for today exists
+          if (todayLog.weight) {
+            setWeight(String(todayLog.weight.value || ""));
+            setMeasuredAt(todayLog.weight.measuredAt || "");
           }
-          if (todayLog.activity && todayLog.activity.type) {
-            const saved = {
-              type: todayLog.activity.type,
-              steps: todayLog.activity.steps || 0,
-              duration: todayLog.activity.duration || 0,
-            };
-            setActivityLogged(saved);
-            localStorage.setItem("activityLogged", JSON.stringify(saved));
-            // prefill inputs
-            setActivityType(saved.type);
-            setSteps(String(saved.steps || ""));
-            setDuration(String(saved.duration || ""));
+          if (todayLog.activity) {
+            setActivityType(todayLog.activity.type || "");
+            setSteps(String(todayLog.activity.steps || ""));
+            setDuration(String(todayLog.activity.duration || ""));
           }
-          if (todayLog.meals) {
-            setMeals({
-              breakfast: todayLog.meals.breakfast || "",
-              lunch: todayLog.meals.lunch || "",
-              snacks: todayLog.meals.snacks || "",
-              dinner: todayLog.meals.dinner || "",
-            });
+           if (todayLog.meals) {
+            setMeals(todayLog.meals)
           }
           if (todayLog.macros) {
-            setMacros({
-              calories: todayLog.macros.calories || 0,
-              carbs: todayLog.macros.carbs || 0,
-              protein: todayLog.macros.protein || 0,
-              fat: todayLog.macros.fat || 0,
-              fiber: todayLog.macros.fiber || 0,
-            });
-            setMealsLogged(true);
-            localStorage.setItem("mealsLogged", "true");
+            setMacros(todayLog.macros);
           }
-        } else {
-          // no log for today -> clear prefilled inputs
-          setWeight("");
-          setMeasuredAt("");
-          setActivityType("");
-          setSteps("");
-          setDuration("");
-          setMeals({ breakfast: "", lunch: "", snacks: "", dinner: "" });
-          setMacros({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
-          setWeightLogged(null);
-          setActivityLogged(null);
-          setMealsLogged(false);
         }
       } catch (err) {
-        console.error("Error loading today's log:", err);
+        setError("Could not load today's data.");
+      } finally {
+        setLoading(false);
       }
-    })();
+    };
+    fetchTodayLog();
   }, []);
 
-  // ---------------- Weight Logging ----------------
-  const logWeight = async () => {
-    if (!measuredAt) {
-      console.error("Please choose when you measured (morning/evening/night).");
+  // --- Event Handlers ---
+
+  const handleLogWeight = async () => {
+    if (!weight || !measuredAt) {
+      alert("Please enter both weight and when it was measured.");
       return;
     }
     try {
-      setLoadingWeight(true);
-      const res = await dailyLogService.logWeight({
+      await dailyLogService.logWeight({
         weight: Number(weight),
         measuredAt,
       });
-      // reflect badge (and keep values visible in inputs)
-      const val =
-        res?.weight?.value ??
-        (typeof res?.weight === "object" ? res?.weight?.value : Number(weight));
-      const when =
-        res?.weight?.measuredAt ??
-        (typeof res?.weight === "object" ? res?.weight?.measuredAt : measuredAt);
-      const saved = { value: val, measuredAt: when };
-      setWeightLogged(saved);
-      localStorage.setItem("weightLogged", JSON.stringify(saved));
+      alert("Weight logged successfully!");
     } catch (err) {
-      console.error("Error logging weight:", err);
-    } finally {
-      setLoadingWeight(false);
+      alert("Failed to log weight. Please try again.");
     }
   };
 
-  // ---------------- Activity Logging ----------------
-  const logActivity = async () => {
+  const handleLogActivity = async () => {
+    if (!activityType) {
+      alert("Please select an activity type.");
+      return;
+    }
     try {
-      setLoadingActivity(true);
       await dailyLogService.logActivity({
-        type: activityType,
-        steps: Number(steps),
-        duration: Number(duration),
-      });
-      const saved = {
         type: activityType,
         steps: Number(steps) || 0,
         duration: Number(duration) || 0,
-      };
-      setActivityLogged(saved);
-      localStorage.setItem("activityLogged", JSON.stringify(saved));
-    } catch (err) {
-      console.error("Error logging activity:", err);
-    } finally {
-      setLoadingActivity(false);
-    }
-  };
-
-  // ---------------- Macro Calculation ----------------
-  const calculateMacros = async () => {
-    try {
-      setLoadingMacros(true);
-      // omit empty strings so backend doesn't overwrite prior meals with blanks
-      const preparedMeals: Record<string, string> = {};
-      (Object.keys(meals) as Array<keyof typeof meals>).forEach((k) => {
-        const val = meals[k];
-        if (typeof val === "string" && val.trim().length > 0) {
-          preparedMeals[k] = val.trim();
-        }
       });
-
-      const data = await dailyLogService.calculateMacros(preparedMeals);
-      if (data?.macros) {
-        setMacros({
-          calories: data.macros.calories || 0,
-          carbs: data.macros.carbs || 0,
-          protein: data.macros.protein || 0,
-          fat: data.macros.fat || 0,
-          fiber: data.macros.fiber || 0,
-        });
-        setMealsLogged(true);
-        localStorage.setItem("mealsLogged", "true");
-      }
+      alert("Activity logged successfully!");
     } catch (err) {
-      console.error("Error calculating macros:", err);
-    } finally {
-      setLoadingMacros(false);
+      alert("Failed to log activity. Please try again.");
     }
   };
 
-  const LoggedBadge = ({ text }: { text: string }) => (
-    <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-      <span aria-hidden>✓</span> {text}
-    </span>
-  );
+  const handleCalculateMacros = async () => {
+    try {
+        const filledMeals = Object.fromEntries(
+            Object.entries(meals).filter(([, value]) => value.trim() !== '')
+        );
 
+        if (Object.keys(filledMeals).length === 0) {
+            alert("Please enter at least one meal to calculate macros.");
+            return;
+        }
+
+      const result = await dailyLogService.calculateMacros(filledMeals);
+      setMacros(result.macros);
+      alert("Macros calculated successfully!");
+    } catch (err) {
+      alert("Failed to calculate macros. Please try again.");
+    }
+  };
+
+  if (loading) {
+      return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+  }
+
+  // Your existing JSX structure with functional handlers
   return (
     <div className="min-h-screen bg-lightblue text-darkblue p-6">
       <Navbar />
-
+      {error && <div className="max-w-4xl mx-auto mt-4 bg-red-100 text-red-700 p-3 rounded-lg text-center">{error}</div>}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto mt-10">
-        {/* ✅ Today’s Weight Section */}
-        <div className="bg-white p-6 rounded-[30px] shadow-md relative">
-          {/* Inline loading bar for Weight */}
-          {loadingWeight && (
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600 animate-pulse rounded-t-[30px]" />
-          )}
+        {/* Today’s Weight Section */}
+        <div className="bg-white p-6 rounded-[30px] shadow-md">
           <h2 className="text-blue text-center font-bold text-xl mb-6">
             Today's Weight
-            {weightLogged && <LoggedBadge text={`Logged: ${weightLogged.value}kg (${weightLogged.measuredAt})`} />}
           </h2>
           <div className="space-y-4">
             <input
@@ -255,39 +151,31 @@ const Home: React.FC = () => {
                 Measured When?
               </label>
               <div className="flex flex-row justify-center gap-4 items-center">
-                <button onClick={() => setMeasuredAt("morning")}>
+                 {/* Adding active state for buttons */}
+                <button onClick={() => setMeasuredAt("morning")} className={`p-2 rounded-full ${measuredAt === 'morning' ? 'bg-yellow-200 ring-2 ring-yellow-400' : ''}`}>
                   <img src={day} alt="Morning" />
                 </button>
-                <button onClick={() => setMeasuredAt("evening")}>
+                <button onClick={() => setMeasuredAt("evening")} className={`p-2 rounded-full ${measuredAt === 'evening' ? 'bg-orange-200 ring-2 ring-orange-400' : ''}`}>
                   <img src={evening} alt="Evening" />
                 </button>
-                <button onClick={() => setMeasuredAt("night")}>
+                <button onClick={() => setMeasuredAt("night")} className={`p-2 rounded-full ${measuredAt === 'night' ? 'bg-blue-200 ring-2 ring-blue-400' : ''}`}>
                   <img src={night} alt="Night" />
                 </button>
               </div>
             </div>
             <button
-              onClick={logWeight}
+              onClick={handleLogWeight}
               className="w-full bg-orange hover:bg-yellow text-white py-2 px-4 rounded-[30px] font-medium transition-colors duration-200"
             >
-              {loadingWeight ? "Logging..." : "Log Weight"}
+              Log Weight
             </button>
           </div>
         </div>
 
-        {/* ✅ Activity Section */}
-        <div className="bg-white p-6 rounded-[30px] shadow-md relative">
-          {/* Inline loading bar for Activity */}
-          {loadingActivity && (
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 to-pink-500 animate-pulse rounded-t-[30px]" />
-          )}
+        {/* Activity Section */}
+        <div className="bg-white p-6 rounded-[30px] shadow-md">
           <h2 className="text-blue text-center font-bold text-xl mb-6">
             Activity
-            {activityLogged && (
-              <LoggedBadge
-                text={`Logged: ${activityLogged.type} (${activityLogged.steps || 0} steps, ${activityLogged.duration || 0} min)`}
-              />
-            )}
           </h2>
           <div className="space-y-3">
             <select
@@ -301,7 +189,6 @@ const Home: React.FC = () => {
               <option value="cycling">Cycling</option>
               <option value="gym">Gym</option>
             </select>
-
             <input
               type="number"
               value={steps}
@@ -309,7 +196,6 @@ const Home: React.FC = () => {
               placeholder="Steps"
               className="w-full p-3 rounded-[30px] bg-gradient-to-r from-[#84BCDA] to-[#F37748] text-center placeholder-white"
             />
-
             <input
               type="number"
               value={duration}
@@ -317,21 +203,19 @@ const Home: React.FC = () => {
               placeholder="Duration (minutes)"
               className="w-full p-3 rounded-[30px] bg-gradient-to-r from-[#84BCDA] to-[#F37748] text-center placeholder-white"
             />
-
             <button
-              onClick={logActivity}
+              onClick={handleLogActivity}
               className="w-full bg-orange hover:bg-yellow text-white py-2 px-4 rounded-[30px] font-medium transition-colors duration-200"
             >
-              {loadingActivity ? "Logging..." : "Log Activity"}
+              Log Activity
             </button>
           </div>
         </div>
 
-        {/* ✅ Meals Section */}
+        {/* Meals Section */}
         <div className="bg-white p-6 rounded-[30px] shadow-md">
           <h2 className="text-blue text-center font-bold text-xl mb-6">
             Meals
-            {mealsLogged && <LoggedBadge text="Logged for today" />}
           </h2>
           <div className="grid grid-cols-2 gap-3 mb-4">
             {Object.keys(meals).map((mealKey) => (
@@ -347,43 +231,32 @@ const Home: React.FC = () => {
             ))}
           </div>
           <button
-            onClick={calculateMacros}
+            onClick={handleCalculateMacros}
             className="w-full bg-orange hover:bg-yellow text-white py-2 px-4 rounded-[30px] font-medium transition-colors duration-200"
           >
-            {loadingMacros ? "Calculating..." : "Calculate Macros"}
+            Calculate Macros
           </button>
         </div>
 
-        {/* ✅ Macros Section */}
-        <div className="bg-white p-6 rounded-[30px] shadow-md relative">
-          {/* Inline loading bar for Macros */}
-          {loadingMacros && (
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-blue-500 animate-pulse rounded-t-[30px]" />
-          )}
+        {/* Macros Section */}
+        <div className="bg-white p-6 rounded-[30px] shadow-md">
           <h2 className="text-blue text-center font-bold text-xl mb-6">Macros</h2>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <tbody className="divide-y divide-lightblue">
-                <tr>
-                  <td className="py-2">Calories: {macros.calories}</td>
-                </tr>
-                <tr>
-                  <td className="py-2">Protein: {macros.protein} g</td>
-                </tr>
-                <tr>
-                  <td className="py-2">Carbs: {macros.carbs} g</td>
-                </tr>
-                <tr>
-                  <td className="py-2">Fat: {macros.fat} g</td>
-                </tr>
-                <tr>
-                  <td className="py-2">Fiber: {macros.fiber} g</td>
-                </tr>
-              </tbody>
-            </table>
+            {macros ? (
+              <table className="w-full">
+                <tbody className="divide-y divide-lightblue">
+                  <tr><td className="py-2">Calories: {macros.calories.toFixed(0)}</td></tr>
+                  <tr><td className="py-2">Protein: {macros.protein.toFixed(1)} g</td></tr>
+                  <tr><td className="py-2">Carbs: {macros.carbs.toFixed(1)} g</td></tr>
+                  <tr><td className="py-2">Fat: {macros.fat.toFixed(1)} g</td></tr>
+                  <tr><td className="py-2">Fiber: {macros.fiber.toFixed(1)} g</td></tr>
+                </tbody>
+              </table>
+            ) : (
+                <p className="text-center text-gray-500">Calculate macros to see your daily summary.</p>
+            )}
           </div>
         </div>
-
       </div>
     </div>
   );

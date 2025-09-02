@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import cors_origins_list
-from .routes import auth, meals, weights, daily, grocery
+# Add 'goals' to this import statement
+from .routes import auth, meals, weights, daily, grocery, goals
 from .db_init import create_indexes  # centralized indexes
 
 # Initialize FastAPI app
@@ -39,3 +40,5 @@ app.include_router(meals.router, prefix="/meals", tags=["Meals"])
 app.include_router(weights.router, prefix="/weights", tags=["Weights"])
 app.include_router(daily.router, prefix="/daily", tags=["Daily Logs"])
 app.include_router(grocery.router, prefix="/grocery", tags=["Grocery"])
+# Add this line to include your new goals router
+app.include_router(goals.router, prefix="/goals", tags=["Goals"])

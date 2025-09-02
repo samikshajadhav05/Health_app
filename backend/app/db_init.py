@@ -17,36 +17,28 @@ async def create_indexes():
         [("email", ASCENDING)], unique=True, name="users_email_idx"
     )
 
-    # Weights - unique per user per day
+    # Weights - unique per user per day is too restrictive, let's index for queries
     await db.weights.create_index(
-        [("user_id", ASCENDING), ("date", ASCENDING)],
-        unique=True,
-        name="weights_user_date_idx",
+        [("user_id", ASCENDING), ("createdAt", DESCENDING)], name="weights_user_createdAt_desc_idx"
     )
 
     # Daily nutrition logs - unique per user per day
     await db.daily_logs.create_index(
-        [("user_id", ASCENDING), ("date", ASCENDING)],
-        unique=True,
-        name="daily_logs_user_date_idx",
-    )
-    # Optimized for fetching most recent logs
-    await db.daily_logs.create_index(
-        [("user_id", ASCENDING), ("date", DESCENDING)],
-        name="daily_logs_user_date_desc_idx",
+        [("user_id", ASCENDING), ("date", DESCENDING)], name="daily_logs_user_date_desc_idx"
     )
 
-    # Meals - TTL 24 hours on createdAt
-    await db.meals.create_index(
+    # --- NEW: TTL Index for generated Meal Plans ---
+    # This collection will store AI-generated plans temporarily.
+    # Documents will be automatically deleted after 24 hours (86400 seconds).
+    await db.meal_plans.create_index(
         [("createdAt", ASCENDING)],
-        name="meals_createdAt_ttl",
-        expireAfterSeconds=24 * 3600,  # 24 hours
+        name="meal_plans_ttl_idx",
+        expireAfterSeconds=86400
     )
-    # Optional: also index by user_id for fast queries
-    await db.meals.create_index(
-        [("user_id", ASCENDING)],
-        name="meals_user_idx",
+    await db.meal_plans.create_index(
+        [("user_id", ASCENDING)], name="meal_plans_user_idx"
     )
+
 
     # Grocery / pantry - unique per user + name_lower
     await db.grocery.create_index(
