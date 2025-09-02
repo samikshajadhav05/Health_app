@@ -1,0 +1,33 @@
+health-app/
+├── backend/                  # Express + Node.js
+│   ├── config/               # DB, environment, etc.
+│   ├── controllers/          # Request handlers
+│   ├── models/               # Mongoose schemas (User, Meal, WeightLog, ActivityLog, etc.)
+│   ├── routes/               # API routes
+│   ├── middleware/           # Auth, validation, error handling
+│   ├── utils/                # TDEE calculation, activity level estimators
+│   └── server.js             # Entry point
+
+├── frontend/                 # React
+│   ├── public/
+│   ├── src/
+│   │   ├── assets/
+│   │   ├── components/       # Reusable components (e.g., MealCard, Graph, etc.)
+│   │   ├── pages/            # Page components (Home, Dashboard, Login, etc.)
+│   │   ├── services/         # API calls (axios)
+│   │   ├── hooks/            # Custom React hooks (e.g., useAuth, useGraph)
+│   │   ├── context/          # React context (auth, user data)
+│   │   ├── utils/            # Helpers (e.g., formatDate, computeCalories)
+│   │   └── App.js
+│   └── package.json
+
+├── ml/                       # (Optional) ML model & logic
+│   ├── notebooks/            # Jupyter notebooks for exploration
+│   ├── models/               # Trained ML models (e.g., activity pattern classifier)
+│   ├── scripts/              # Scripts for training/inference
+│   └── api/                  # Python microservice or TensorFlow.js integration
+
+├── .env
+├── .gitignore
+├── package.json              # Root if monorepo
+└── README.md
