@@ -1,0 +1,9 @@
+# Auto-handle line endings for consistency
+* text=auto
+
+# Explicitly set text files
+*.js text
+*.json text
+*.css text
+*.html text
+*.py text
