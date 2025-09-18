@@ -1,0 +1,24 @@
+<svg width="249" height="245" viewBox="0 0 249 245" fill="none" xmlns="http://www.w3.org/2000/svg">
+<ellipse cx="29" cy="10" rx="29" ry="10" transform="matrix(-0.983192 0.182575 0.182575 0.983192 114.025 214)" fill="#F37748"/>
+<ellipse cx="155.338" cy="229.127" rx="29" ry="10" transform="rotate(10.5198 155.338 229.127)" fill="#F37748"/>
+<ellipse cx="205.338" cy="116.127" rx="29" ry="10" transform="rotate(10.5198 205.338 116.127)" fill="#F37748"/>
+<ellipse cx="29" cy="10" rx="29" ry="10" transform="matrix(-0.983192 0.182575 0.182575 0.983192 68.0251 105)" fill="#F37748"/>
+<ellipse cx="122" cy="128" rx="70" ry="101" fill="url(#paint0_radial_149_306)"/>
+<circle cx="90.4751" cy="90.35" r="22.875" fill="#D9D9D9"/>
+<circle cx="149.95" cy="90.35" r="22.875" fill="#D9D9D9"/>
+<circle cx="122.5" cy="154.4" r="50.325" fill="#D9D9D9"/>
+<circle cx="122.5" cy="99.5" r="18.3" fill="#D9D9D9"/>
+<circle cx="147.662" cy="89.2125" r="11.4375" fill="black"/>
+<circle cx="93.3374" cy="90.2125" r="11.4375" fill="black"/>
+<circle cx="145.375" cy="91.5" r="4.575" fill="#D9D9D9"/>
+<circle cx="91.0501" cy="92.5" r="4.575" fill="#D9D9D9"/>
+<circle cx="97.9125" cy="85.6375" r="2.2875" fill="#D9D9D9"/>
+<circle cx="152.237" cy="84.6375" r="2.2875" fill="#D9D9D9"/>
+<circle cx="124.788" cy="102.938" r="6.8625" fill="#F37748"/>
+<defs>
+<radialGradient id="paint0_radial_149_306" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(122 128) rotate(90) scale(101 70)">
+<stop stop-color="#FFF1B2"/>
+<stop offset="1" stop-color="#8A009D"/>
+</radialGradient>
+</defs>
+</svg>

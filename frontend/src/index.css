@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .text-white { color: #FFECE5; }
+  .text-blue { color: #067BC2; }
+  .text-darkblue { color: #00263D; }
+  
+  .bg-white { background-color: #FFECE5; }
+  .bg-lightblue { background-color: #84BCDA; }
+  .bg-midblue { color: #067BC2; }
+  .bg-darkblue { color: #00263D; }
+  .bg-orange { background-color: #F37748; }
+  .bg-yellow { background-color: #ECC30B; }
+}
