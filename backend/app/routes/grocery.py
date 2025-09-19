@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 from datetime import datetime
 from ..db import db
-from ..utils import to_object_id, to_str_id
+from ..utils import to_object_id, to_str_id  # Ensure to_str_id is imported
 from ..services.auth_service import get_current_user
 from ..models.grocery import GroceryItem, GroceryCreate
 
@@ -39,7 +39,15 @@ async def add_grocery_item(item: GroceryCreate, current_user=Depends(get_current
 async def get_grocery_items(status: str = "in_stock", current_user=Depends(get_current_user)):
     user_id = to_object_id(current_user["_id"])
     cursor = db.grocery.find({"user_id": user_id, "status": status})
-    items = await cursor.to_list(length=100)
+    
+    # --- THIS IS THE FIX ---
+    # We must manually convert ObjectId to string before returning the response.
+    items = []
+    async for doc in cursor:
+        doc["_id"] = to_str_id(doc["_id"])
+        doc["user_id"] = to_str_id(doc["user_id"])
+        items.append(doc)
+    
     return items
 
 

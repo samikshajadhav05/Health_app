@@ -14,12 +14,20 @@ const authHeaders = () => {
 
 export const mealService = {
   /**
-   * Fetches all individual meal entries logged for the current user for today.
-   * This is used to pre-fill the meal input boxes on the Home page when it loads.
+   * Fetches all individual meal entries logged for today.
    */
   async getTodaysMeals(): Promise<any[]> {
     const url = `${MEALS_URL}/today`;
     const res = await axios.get(url, { headers: { ...authHeaders() } });
+    return res.data;
+  },
+
+  /**
+   * NEW: Asks the backend to suggest meals for today.
+   */
+  async suggestTodaysMeals(): Promise<{ breakfast: string, lunch: string, dinner: string }> {
+    const url = `${MEALS_URL}/suggest-day`;
+    const res = await axios.post(url, {}, { headers: { ...authHeaders() } });
     return res.data;
   },
 };

@@ -7,16 +7,34 @@ from ..services.auth_service import get_current_user
 from ..services.ai_service import generate_meal_plan
 from ..models.meal_plan import MealPlan, PlannedMeal
 
+# --- DEBUG LOG ---
+# This will print in your terminal when the server starts if the file is loaded.
+print("[DEBUG] SUCCESS: Loading meal_plans.py routes...")
+
 router = APIRouter()
 
 @router.get("/{week_start_date}", response_model=MealPlan)
 async def get_meal_plan(week_start_date: str, current_user=Depends(get_current_user)):
+    """
+    Fetches the meal plan for a specific week.
+    """
+    # --- DEBUG LOG ---
+    print(f"\n[DEBUG] HIT: GET /meal-plans/{{week_start_date}} endpoint.")
+    print(f"[DEBUG] week_start_date received from URL: '{week_start_date}'")
+
     user_id = to_object_id(current_user["_id"])
+    print(f"[DEBUG] Querying database for user_id: '{user_id}' and weekStart: '{week_start_date}'")
+
     plan = await db.meal_plans.find_one({"user_id": user_id, "weekStart": week_start_date})
+    
     if not plan:
+        print(f"[DEBUG] RESULT: Meal plan NOT FOUND in database.")
         raise HTTPException(status_code=404, detail="Meal plan not found for this week.")
+    
+    print(f"[DEBUG] RESULT: Meal plan FOUND. Returning plan with ID: {plan.get('_id')}")
     return plan
 
+# (The rest of your generate and update functions remain the same)
 @router.post("/generate", response_model=MealPlan, status_code=status.HTTP_201_CREATED)
 async def generate_new_meal_plan(payload: dict, current_user=Depends(get_current_user)):
     user_id = to_object_id(current_user["_id"])

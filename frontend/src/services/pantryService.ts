@@ -19,17 +19,12 @@ const auth = () => {
 };
 
 export const pantryService = {
-  /**
-   * Fetches items by status, matching the backend endpoint (`/grocery?status=...`).
-   */
+ 
   async list(status: 'in_stock' | 'to_buy'): Promise<PantryItem[]> {
-    const res = await axios.get(`${API_BASE_URL}/grocery?status=${status}`, { headers: auth() });
+    const res = await axios.get(`${API_BASE_URL}/grocery/?status=${status}`, { headers: auth() });
     return res.data;
   },
 
-  /**
-   * Adds a new item to the grocery list.
-   */
   async add(item: { name: string, status: 'in_stock' | 'to_buy' }): Promise<PantryItem> {
     const res = await axios.post(`${API_BASE_URL}/grocery`, item, { headers: auth() });
     return res.data;

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import cors_origins_list
-# Make sure 'meal_plans' is in this import list
+# CORRECTED: Ensure all routers, including meal_plans, are imported.
 from .routes import auth, meals, weights, daily, grocery, goal, activity, meal_plans
 from .db_init import create_indexes
 
@@ -40,6 +40,5 @@ app.include_router(grocery.router, prefix="/grocery", tags=["Grocery"])
 app.include_router(goal.router, prefix="/goals", tags=["Goals"])
 app.include_router(activity.router, prefix="/activity", tags=["Activity"])
 
-# This is the crucial line that activates your new API endpoints
+# THIS LINE IS THE FIX: It explicitly tells the app to use your meal_plans.py routes.
 app.include_router(meal_plans.router, prefix="/meal-plans", tags=["Meal Plans"])
-

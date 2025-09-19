@@ -1,18 +1,16 @@
-# app/routes/meals.py
+# backend/app/routes/meals.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime, time
 from ..db import db
 from ..utils import to_object_id, to_str_id
-# CORRECTED: Import from the new ai_service.py file
-from ..services.ai_service import estimate_calories, generate_meal_plan
+from ..services.ai_service import generate_meal_plan
 from ..services.auth_service import get_current_user
 from ..models.meal import MealCreate
+
 router = APIRouter()
 
-# (The rest of your meals.py file remains the same)
 @router.get("/today")
 async def get_todays_meals(current_user=Depends(get_current_user)):
-    # ... function content ...
     user_id = to_object_id(current_user["_id"])
     today_start = datetime.combine(datetime.utcnow().date(), time.min)
     today_end = datetime.combine(datetime.utcnow().date(), time.max)
@@ -29,67 +27,83 @@ async def get_todays_meals(current_user=Depends(get_current_user)):
         })
     return meals
 
-@router.post("/suggest", response_model=dict)
-async def suggest_meal_plan(current_user=Depends(get_current_user)):
-    # ... function content ...
+@router.post("/suggest-day", response_model=dict)
+async def suggest_todays_meals(current_user=Depends(get_current_user)):
+    """
+    Generates a personalized meal suggestion and updates the user's shopping list.
+    """
     user_id = to_object_id(current_user["_id"])
-    latest_weight_doc = await db.weights.find_one(
-        {"user_id": user_id}, sort=[("createdAt", -1)]
-    )
-    if not latest_weight_doc:
-        raise HTTPException(status_code=404, detail="No weight data found.")
-    current_weight = latest_weight_doc["weight"]
-
+    
+    # Fetch user data for the AI
+    latest_weight_doc = await db.weights.find_one({"user_id": user_id}, sort=[("createdAt", -1)])
     goal_doc = await db.goals.find_one({"user_id": user_id})
-    if not goal_doc or not goal_doc.get("goal_type"):
-        raise HTTPException(status_code=404, detail="No health goal set.")
-    goal = goal_doc["goal_type"]
+    # Fetch user's recent average macros from daily logs
+    log_cursor = db.daily_logs.find({"user_id": user_id}).sort("date", -1).limit(7)
+    
+    # Calculate average macros from the last 7 logs
+    total_macros = {"calories": 0, "protein": 0, "carbs": 0, "fat": 0}
+    count = 0
+    async for log in log_cursor:
+        for key in total_macros:
+            total_macros[key] += log.get("totals", {}).get(key, 0)
+        count += 1
+    
+    recent_macros = {k: round(v / count, 1) for k, v in total_macros.items()} if count > 0 else {}
 
+    current_weight = latest_weight_doc.get("weight") if latest_weight_doc else 75
+    goal = goal_doc.get("goal_type") if goal_doc else "maintenance"
+
+    # Fetch pantry items for the AI
     grocery_cursor = db.grocery.find({"user_id": user_id, "status": "in_stock"})
     in_stock_items = [doc["name"] async for doc in grocery_cursor]
-    if not in_stock_items:
-        raise HTTPException(status_code=404, detail="Your 'in_stock' grocery list is empty.")
 
     try:
-        meal_plan = generate_meal_plan(
+        # Call the enhanced AI service
+        ai_response = generate_meal_plan(
             goal=goal,
             current_weight=current_weight,
-            grocery_list=in_stock_items
+            grocery_list=in_stock_items,
+            recent_macros=recent_macros
         )
+        
+        # Check for a shopping list and add items to the user's grocery 'to_buy' list
+        shopping_list = ai_response.get("shopping_list")
+        if shopping_list:
+            for item_name in shopping_list:
+                # Use upsert to avoid duplicate items in the 'to_buy' list
+                await db.grocery.update_one(
+                    {"user_id": user_id, "name_lower": item_name.lower()},
+                    {"$set": {
+                        "user_id": user_id,
+                        "name": item_name,
+                        "name_lower": item_name.lower(),
+                        "status": "to_buy",
+                        "createdAt": datetime.utcnow()
+                    }},
+                    upsert=True
+                )
+        
+        # Return only the meal plan part to the frontend
+        meal_plan = {
+            "breakfast": ai_response.get("breakfast"),
+            "lunch": ai_response.get("lunch"),
+            "dinner": ai_response.get("dinner"),
+        }
+        return meal_plan
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate meal plan from AI: {str(e)}")
 
-    return {"goal": goal, "current_weight": current_weight, "meal_plan": meal_plan}
-
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_meal_entry(meal: MealCreate, current_user=Depends(get_current_user)):
-    """
-    Creates a single meal entry for the user for a given date.
-    """
     user_id = to_object_id(current_user["_id"])
     
-    # Check if a meal of the same type already exists for that day to avoid duplicates
-    existing_meal = await db.meals.find_one({
+    meal_doc = {
         "user_id": user_id,
+        "meal_type": meal.meal_type,
+        "description": meal.description,
         "date": meal.date,
-        "meal_type": meal.meal_type
-    })
-    
-    if existing_meal:
-        # If it exists, update it (upsert behavior)
-        await db.meals.update_one(
-            {"_id": existing_meal["_id"]},
-            {"$set": {"description": meal.description}}
-        )
-        return {"message": "Meal updated successfully"}
-    else:
-        # If not, create a new one
-        meal_doc = {
-            "user_id": user_id,
-            "meal_type": meal.meal_type,
-            "description": meal.description,
-            "date": meal.date,
-            "createdAt": datetime.utcnow()
-        }
-        await db.meals.insert_one(meal_doc)
-        return {"message": "Meal created successfully"}
+        "createdAt": datetime.utcnow()
+    }
+    await db.meals.insert_one(meal_doc)
+    return {"message": "Meal created successfully"}
+
